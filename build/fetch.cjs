@@ -43,7 +43,8 @@ async function fetchLanguages(name) {
     return Object.entries(map)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 4)
-      .map(([lang, bytes]) => ({ name: lang, pct: Math.round((bytes / total) * 100) }));
+      .map(([lang, bytes]) => ({ name: lang, pct: Math.round((bytes / total) * 100) }))
+      .filter((l) => l.pct > 0);
   } catch {
     return null;
   }
