@@ -65,6 +65,26 @@
     "language": "Python",
     "stars": 0,
     "url": "https://github.com/eld1kz/schub_friday",
-    "pushed_at": null
+    "pushed_at": "2026-06-27T05:13:06Z",
+    "created_at": "2026-06-05T16:51:34Z",
+    "forks": 0,
+    "openIssues": 0,
+    "topics": [],
+    "languages": [
+      {
+        "name": "Python",
+        "pct": 100
+      },
+      {
+        "name": "Dockerfile",
+        "pct": 0
+      }
+    ],
+    "lastCommit": {
+      "message": "Move build-tracker out to its own repo; keep progress.md",
+      "date": "2026-06-27T05:13:05Z",
+      "url": "https://github.com/eld1kz/schub_friday/commit/749b85f38d9c8cd9adaf7c3e767c91fa17cee7cb"
+    },
+    "commitCount": 20
   }
 ]
