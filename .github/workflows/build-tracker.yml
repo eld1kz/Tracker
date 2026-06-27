@@ -28,27 +28,28 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Bake stats.json
+      - name: Bake data.json
         env:
-          # Fine-grained PAT with read-only Contents + Metadata on your repos.
-          # Add it under Settings → Secrets → Actions as TRACKER_TOKEN.
-          # Optional: with no secret, the dashboard still works (live fetch).
+          # Fine-grained PAT with read-only Contents + Metadata on every repo you
+          # want shown (incl. private). Add under Settings → Secrets → Actions as
+          # TRACKER_TOKEN. With no secret, the dashboard still works via the live
+          # public-repo fetch.
           TRACKER_TOKEN: ${{ secrets.TRACKER_TOKEN }}
         run: |
           if [ -z "$TRACKER_TOKEN" ]; then
-            echo "::notice::TRACKER_TOKEN secret not set — skipping optional stats bake."
+            echo "::notice::TRACKER_TOKEN secret not set — skipping bake (live fetch still works)."
             exit 0
           fi
           node build/fetch.cjs
 
-      - name: Commit stats.json if changed
+      - name: Commit data.json if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet -- stats.json; then
-            git add stats.json
-            git commit -m "chore: refresh dashboard stats [skip ci]"
+          if ! git diff --quiet -- data.json; then
+            git add data.json
+            git commit -m "chore: refresh dashboard data [skip ci]"
             git push
           else
-            echo "No changes to stats.json."
+            echo "No changes to data.json."
           fi

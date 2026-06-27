@@ -114,18 +114,24 @@ async function fetchRepos() {
   }
 }
 
-// Optional server-baked stats.json (true language bytes, commit counts, private
-// repos). Absent on a vanilla deploy — that's fine, we just skip the extras.
-async function fetchStats() {
-  const key = "cd:stats";
+// Server-baked data.json: the complete dataset (metadata + true language bytes +
+// commits + progress.md), including private repos, produced by the Action with a
+// token. Primary source when present; the live public fetch below is the
+// zero-config fallback. Absent on a vanilla deploy — that's fine.
+async function fetchBaked() {
   try {
-    const res = await fetch(`stats.json?t=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch(`data.json?t=${Date.now()}`, { cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
-    cacheSet(key, data);
-    return data;
+    const projects = Array.isArray(data) ? data : data.projects;
+    if (!projects || !projects.length) return null;
+    return {
+      projects,
+      languagesAgg: data.languagesAgg || null,
+      generatedAt: data.generatedAt || null,
+    };
   } catch {
-    return cacheStale(key); // serve last-known if the fetch itself failed
+    return null;
   }
 }
 
@@ -181,34 +187,28 @@ function statusOf(repo) {
   return "stale";
 }
 
+// Normalizes a repo (baked or live) into the render model. Baked repos arrive
+// with tracker/languages/commits already attached; live repos have them null.
 function toModel(repo) {
-  return {
+  const m = {
     ...repo,
     title: repo.name,
     status: statusOf(repo),
-    tracker: null,
-    languages: null, // true byte breakdown, only from stats.json
-    commitCount: null,
-    lastCommit: null,
+    tracker: repo.tracker || null,
+    languages: repo.languages || null,
+    commitCount: repo.commitCount ?? null,
+    lastCommit: repo.lastCommit || null,
   };
+  if (m.tracker && m.tracker.title) m.title = m.tracker.title;
+  if (m.tracker && m.tracker.description && !m.description) m.description = m.tracker.description;
+  return m;
 }
 
-function mergeStats(stats) {
-  if (!stats || !stats.repos) return;
-  for (const p of STATE.projects) {
-    const s = stats.repos[p.name];
-    if (!s) continue;
-    if (s.languages) p.languages = s.languages;
-    if (s.commitCount != null) p.commitCount = s.commitCount;
-    if (s.lastCommit) p.lastCommit = s.lastCommit;
-  }
-}
-
-// Aggregate "languages I use most". Prefers true bytes baked in stats.json;
+// Aggregate "languages I use most". Prefers true bytes baked in data.json;
 // otherwise approximates from each repo's primary language (no extra API calls).
 function aggregateLanguages() {
-  if (STATE.stats && STATE.stats.languagesAgg && STATE.stats.languagesAgg.length) {
-    return STATE.stats.languagesAgg.slice(0, 6);
+  if (STATE.languagesAgg && STATE.languagesAgg.length) {
+    return STATE.languagesAgg.slice(0, 6);
   }
   const counts = {};
   for (const p of STATE.projects) {
@@ -256,7 +256,7 @@ function featureCounts() {
 }
 
 // ─── Home ────────────────────────────────────────────────────────────────────
-let STATE = { projects: [], stats: null, cachedAt: 0, showDormant: false, trackersLoaded: false };
+let STATE = { projects: [], languagesAgg: null, cachedAt: 0, showDormant: false, baked: false, stale: false };
 
 function snapshotHTML(projects) {
   const active = projects.filter((p) => p.status === "active").length;
@@ -413,8 +413,9 @@ function dashHead() {
 
 function refreshNote() {
   const when = STATE.cachedAt ? timeAgo(new Date(STATE.cachedAt).toISOString()) : "just now";
+  const src = STATE.baked ? "Baked from the GitHub API" : "Auto-discovered from the GitHub API";
   const stale = STATE.stale ? " · showing cached data (GitHub rate limit)" : "";
-  return `<p class="refresh-note">Auto-discovered from the GitHub API · cached ${when}${stale}</p>`;
+  return `<p class="refresh-note">${src} · updated ${when}${stale}</p>`;
 }
 
 // ─── Project detail ──────────────────────────────────────────────────────────
@@ -530,12 +531,23 @@ async function boot() {
   }
 
   try {
-    const [{ repos, cachedAt, stale }, stats] = await Promise.all([fetchRepos(), fetchStats()]);
+    // Prefer the server-baked dataset (complete, includes private repos).
+    const baked = await fetchBaked();
+    if (baked) {
+      STATE.projects = baked.projects.map(toModel);
+      STATE.languagesAgg = baked.languagesAgg;
+      STATE.cachedAt = baked.generatedAt ? new Date(baked.generatedAt).getTime() : Date.now();
+      STATE.baked = true;
+      window.addEventListener("hashchange", route);
+      route();
+      return;
+    }
+
+    // Zero-config fallback: live public repos only (one unauthenticated call).
+    const { repos, cachedAt, stale } = await fetchRepos();
     STATE.projects = repos.map(toModel);
     STATE.cachedAt = cachedAt;
     STATE.stale = stale;
-    STATE.stats = stats;
-    if (stats) mergeStats(stats);
 
     window.addEventListener("hashchange", route);
     route(); // paint immediately from the one API call
