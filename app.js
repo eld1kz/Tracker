@@ -120,14 +120,27 @@ function langDot(lang) {
   return `<span class="lang-dot" style="background:${c}"></span>`;
 }
 
+// Segmented language bar + legend from [{ name, pct }].
+function langBar(langs) {
+  if (!langs || !langs.length) return "";
+  const segs = langs.map((l) =>
+    `<span class="langbar-seg" style="width:${l.pct}%;background:${LANG_COLORS[l.name] || "#86868b"}" title="${esc(l.name)} ${l.pct}%"></span>`
+  ).join("");
+  const legend = langs.map((l) =>
+    `<span>${langDot(l.name)}${esc(l.name)} ${l.pct}%</span>`
+  ).join("");
+  return `<div class="langbar">${segs}</div><div class="langbar-legend">${legend}</div>`;
+}
+
 function renderDashboard(projects) {
   const feats = allFeatures(projects);
   const count = (s) => feats.filter((f) => f.status === s).length;
   const recent = [...projects].sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at)).slice(0, 8);
+  const totalCommits = projects.reduce((n, p) => n + (p.commitCount || 0), 0);
 
   return `
     <h1 class="page-title">${esc(CFG.ownerName || "My")}'s Builds</h1>
-    <p class="page-subtitle">Live progress across ${projects.length} project${projects.length === 1 ? "" : "s"}, straight from GitHub.</p>
+    <p class="page-subtitle">Live progress across ${projects.length} project${projects.length === 1 ? "" : "s"}${totalCommits ? ` · ${totalCommits.toLocaleString()} commits` : ""}, straight from GitHub.</p>
 
     <div class="stats">
       <a class="stat-card" href="#/" style="text-decoration:none">
@@ -152,6 +165,7 @@ function renderDashboard(projects) {
             <div class="activity-name">${esc(p.title)}</div>
             <div class="activity-meta">
               ${p.language ? `<span>${langDot(p.language)}${esc(p.language)}</span>` : ""}
+              ${p.commitCount ? `<span>${p.commitCount} commits</span>` : ""}
               ${p.stars ? `<span>★ ${p.stars}</span>` : ""}
               <span>${p.pushed_at ? timeAgo(p.pushed_at) : ""}</span>
             </div>
@@ -240,10 +254,25 @@ function renderProject(name) {
     ${p.description ? `<p class="page-subtitle">${esc(p.description)}</p>` : ""}
     <div class="detail-meta">
       ${p.language ? `<span>${langDot(p.language)}${esc(p.language)}</span>` : ""}
+      ${p.commitCount != null ? `<span>${p.commitCount.toLocaleString()} commits</span>` : ""}
       ${p.stars ? `<span>★ ${p.stars} stars</span>` : ""}
+      ${p.forks ? `<span>⑂ ${p.forks} forks</span>` : ""}
+      ${p.openIssues ? `<span>${p.openIssues} open issue${p.openIssues === 1 ? "" : "s"}</span>` : ""}
+      ${p.created_at ? `<span>Started ${timeAgo(p.created_at)}</span>` : ""}
       ${p.pushed_at ? `<span>Updated ${timeAgo(p.pushed_at)}</span>` : ""}
       <span><a style="color:var(--accent)" href="${esc(p.url)}" target="_blank" rel="noopener">View on GitHub ↗</a></span>
     </div>
+
+    ${p.lastCommit ? `
+      <a class="last-commit" href="${esc(p.lastCommit.url)}" target="_blank" rel="noopener">
+        <span class="last-commit-label">Latest commit</span>
+        <span class="last-commit-msg">${esc(p.lastCommit.message)}</span>
+        ${p.lastCommit.date ? `<span class="last-commit-time">${timeAgo(p.lastCommit.date)}</span>` : ""}
+      </a>` : ""}
+
+    ${langBar(p.languages)}
+
+    ${p.topics && p.topics.length ? `<div class="topics">${p.topics.map((t) => `<span class="topic-chip">${esc(t)}</span>`).join("")}</div>` : ""}
 
     ${p.stack.length ? `<div class="stack">${p.stack.map((s) => `<span class="stack-chip">${esc(s)}</span>`).join("")}</div>` : ""}
 

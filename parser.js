@@ -64,6 +64,13 @@
       stars: repo.stars,
       url: repo.url,
       pushed_at: repo.pushed_at,
+      created_at: repo.created_at || null,
+      forks: repo.forks || 0,
+      openIssues: repo.openIssues || 0,
+      topics: repo.topics || [],
+      languages: repo.languages || null,
+      lastCommit: repo.lastCommit || null,
+      commitCount: repo.commitCount ?? null,
     };
   }
 

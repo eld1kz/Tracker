@@ -32,6 +32,50 @@ const gh = async (url) => {
   return res;
 };
 
+// Language byte breakdown → top few { name, pct }. Null on failure.
+async function fetchLanguages(name) {
+  try {
+    const res = await gh(`https://api.github.com/repos/${CFG.username}/${name}/languages`);
+    if (!res.ok) return null;
+    const map = await res.json();
+    const total = Object.values(map).reduce((a, b) => a + b, 0);
+    if (!total) return null;
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([lang, bytes]) => ({ name: lang, pct: Math.round((bytes / total) * 100) }));
+  } catch {
+    return null;
+  }
+}
+
+// Latest commit (first line + date + url) and total commit count (via the
+// Link header's last-page number). Returns nulls on failure.
+async function fetchLastCommit(name, branch) {
+  try {
+    const res = await gh(
+      `https://api.github.com/repos/${CFG.username}/${name}/commits?per_page=1&sha=${branch}`
+    );
+    if (!res.ok) return { lastCommit: null, commitCount: null };
+    const list = await res.json();
+    const c = Array.isArray(list) && list[0];
+    const lastCommit = c
+      ? {
+          message: (c.commit.message || "").split("\n")[0],
+          date: c.commit.author?.date || c.commit.committer?.date || null,
+          url: c.html_url,
+        }
+      : null;
+    let commitCount = Array.isArray(list) ? list.length : null;
+    const link = res.headers.get("link");
+    const m = link && link.match(/[?&]page=(\d+)>;\s*rel="last"/);
+    if (m) commitCount = parseInt(m[1], 10);
+    return { lastCommit, commitCount };
+  } catch {
+    return { lastCommit: null, commitCount: null };
+  }
+}
+
 async function fetchRepo(name) {
   const metaRes = await gh(`https://api.github.com/repos/${CFG.username}/${name}`);
   if (!metaRes.ok) {
@@ -39,6 +83,10 @@ async function fetchRepo(name) {
     return null;
   }
   const r = await metaRes.json();
+  const [languages, commitInfo] = await Promise.all([
+    fetchLanguages(name),
+    fetchLastCommit(name, r.default_branch),
+  ]);
   const repo = {
     name: r.name,
     description: r.description,
@@ -46,6 +94,13 @@ async function fetchRepo(name) {
     stars: r.stargazers_count,
     url: r.html_url,
     pushed_at: r.pushed_at,
+    created_at: r.created_at,
+    forks: r.forks_count,
+    openIssues: r.open_issues_count,
+    topics: r.topics || [],
+    languages,
+    lastCommit: commitInfo.lastCommit,
+    commitCount: commitInfo.commitCount,
   };
 
   // progress.md via the contents API (base64). 404 = no tracker file yet.
