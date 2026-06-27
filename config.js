@@ -1,27 +1,24 @@
-// ─── Build Tracker configuration ───────────────────────────────────────────
-// Edit this file and commit. The GitHub Action re-bakes data.json on push.
+// ─── Coder Dashboard configuration ──────────────────────────────────────────
+// The ONLY required field is `username`. Everything below has sensible
+// defaults. No repo list — every public repo is auto-discovered from the
+// GitHub API. No tokens, no secrets ever ship to the browser.
 
 const TRACKER_CONFIG = {
-  // Your GitHub username.
-  username: "eld1kz",
+  // ── Required ──────────────────────────────────────────────────────────────
+  username: "eld1kz", // ← your GitHub username
 
-  // Your name, shown in the header.
-  ownerName: "Eldar",
+  // ── Optional cosmetics ──────────────────────────────────────────────────
+  ownerName: "Eldar", // display name in the header (falls back to username)
+  tagline: "What I'm building — live from GitHub.",
 
-  // Curated list of repos to show on the board, in display order.
-  // Use just the repo name (not the full owner/name path). Private repos are
-  // fine — they're read at build time with a server-side token, never the
-  // browser. See README "Private repos".
-  repos: [
-    "schub_friday", // the assistant (displays as "Jarvis Assistant" via its progress.md title)
-    // add more project repos here as you go
-  ],
+  // ── Active / stale thresholds (days since last push) ─────────────────────
+  activeDays: 14, // pushed within this many days  → "Active"
+  staleDays: 60, // older than this many days     → "Dormant" (collapsed)
 
-  // Name of the tracker file each repo contains (at its root).
-  trackerFile: "progress.md",
-
-  // Live-fetch fallback only (public repos): how long to cache in the browser.
-  cacheTTLMinutes: 15,
+  // ── Behaviour ────────────────────────────────────────────────────────────
+  includeForks: false, // forks pollute the "what I'm building" signal
+  trackerFile: "progress.md", // optional per-repo progress file
+  cacheTTLMinutes: 60, // localStorage cache lifetime (respects 60 req/hr limit)
 };
 
 // Isomorphic export: <script> tag in the browser, require() in the build script.

@@ -1,17 +1,24 @@
-// ─── Build Tracker ──────────────────────────────────────────────────────────
-// Renders a dashboard + kanban + per-project detail. Primary data source is a
-// baked data.json (produced by the GitHub Action — works for PRIVATE repos
-// with no token in the browser). Falls back to the live GitHub API when there's
-// no data.json, which only works for public repos.
+// ─── Coder Dashboard ─────────────────────────────────────────────────────────
+// A personal "what am I working on" dashboard. Auto-discovers every public repo
+// from the GitHub API using just a username — ONE unauthenticated call, cached
+// in localStorage. progress.md (optional, per repo) is fetched lazily from
+// raw.githubusercontent.com (a different host, NOT subject to the 60-req/hr API
+// limit). Richer/private stats can be baked server-side into an optional
+// stats.json; if it's absent, those bits simply don't render. No fake data —
+// ever. If a signal isn't real, it's omitted.
 
 const CFG = window.TRACKER_CONFIG || {};
-const { normStatus, parseProgress, mergeProject } = window.TrackerParser;
+const { parseProgress } = window.TrackerParser;
 const APP = document.getElementById("app");
 
-const STATUS = {
-  planned: { key: "planned", label: "Planned", css: "planned" },
-  "in-progress": { key: "in-progress", label: "In Progress", css: "progress" },
-  done: { key: "done", label: "Done", css: "done" },
+const ACTIVE_DAYS = CFG.activeDays || 14;
+const STALE_DAYS = CFG.staleDays || 60;
+
+const STATUS_LABEL = {
+  active: "Active",
+  recent: "Recent",
+  stale: "Dormant",
+  archived: "Archived",
 };
 
 // Restrained palette for language dots (Apple-ish accents).
@@ -19,17 +26,23 @@ const LANG_COLORS = {
   JavaScript: "#f1c40f", TypeScript: "#2997ff", Python: "#34c759",
   Swift: "#ff9f0a", HTML: "#ff6b5e", CSS: "#a06bff", Go: "#5ac8e8",
   Rust: "#d2855a", Java: "#e07a5f", Shell: "#86868b", Ruby: "#ff453a",
+  "C++": "#5ac8e8", C: "#86868b", "C#": "#a06bff", PHP: "#a06bff",
+  Kotlin: "#ff9f0a", Dart: "#2997ff", Vue: "#34c759", Dockerfile: "#86868b",
 };
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 function timeAgo(iso) {
-  const then = new Date(iso).getTime();
-  const days = Math.floor((Date.now() - then) / 86400000);
+  if (!iso) return "";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 30) return `${days}d ago`;
   if (days < 365) return `${Math.floor(days / 30)}mo ago`;
   return `${Math.floor(days / 365)}y ago`;
+}
+
+function daysSince(iso) {
+  return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : Infinity;
 }
 
 function esc(str) {
@@ -38,229 +51,406 @@ function esc(str) {
   return d.innerHTML;
 }
 
-// ─── Data layer (with localStorage cache) ────────────────────────────────────
+function langDot(lang) {
+  if (!lang) return "";
+  return `<span class="lang-dot" style="background:${LANG_COLORS[lang] || "#86868b"}"></span>`;
+}
+
+// ─── localStorage cache (with stale fallback for rate-limit safety) ──────────
+function cacheRaw(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+}
 function cacheGet(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const { ts, data } = JSON.parse(raw);
-    const ttl = (CFG.cacheTTLMinutes || 15) * 60000;
-    if (Date.now() - ts > ttl) return null;
-    return data;
-  } catch { return null; }
+  const e = cacheRaw(key);
+  if (!e) return null;
+  const ttl = (CFG.cacheTTLMinutes || 60) * 60000;
+  return Date.now() - e.ts > ttl ? null : e.data;
+}
+function cacheStale(key) {
+  const e = cacheRaw(key);
+  return e ? e.data : null;
 }
 function cacheSet(key, data) {
   try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
 
-async function fetchRepoList() {
-  const key = `bt:repos:${CFG.username}`;
-  const cached = cacheGet(key);
-  if (cached) return cached;
-  const res = await fetch(
-    `https://api.github.com/users/${CFG.username}/repos?per_page=100&sort=updated`,
-    { headers: { Accept: "application/vnd.github+json" } }
-  );
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
-  const list = await res.json();
-  const slim = list.map((r) => ({
-    name: r.name, description: r.description, language: r.language,
-    stars: r.stargazers_count, url: r.html_url,
-    pushed_at: r.pushed_at, default_branch: r.default_branch,
-  }));
-  cacheSet(key, slim);
-  return slim;
+// ─── Data layer ──────────────────────────────────────────────────────────────
+// ONE API call. Returns every public repo, slimmed to what we render.
+async function fetchRepos() {
+  const key = `cd:repos:${CFG.username}`;
+  const fresh = cacheGet(key);
+  if (fresh) return { repos: fresh, cachedAt: cacheRaw(key).ts };
+
+  try {
+    const res = await fetch(
+      `https://api.github.com/users/${CFG.username}/repos?per_page=100&sort=pushed`,
+      { headers: { Accept: "application/vnd.github+json" } }
+    );
+    if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+    const list = await res.json();
+    const slim = list.map((r) => ({
+      name: r.name,
+      description: r.description || "",
+      language: r.language,
+      stars: r.stargazers_count,
+      forks: r.forks_count,
+      openIssues: r.open_issues_count,
+      url: r.html_url,
+      homepage: r.homepage || "",
+      topics: r.topics || [],
+      pushed_at: r.pushed_at,
+      created_at: r.created_at,
+      archived: r.archived,
+      fork: r.fork,
+      default_branch: r.default_branch,
+    }));
+    cacheSet(key, slim);
+    return { repos: slim, cachedAt: Date.now() };
+  } catch (err) {
+    // Rate-limited or offline: fall back to a stale cache if we have one.
+    const stale = cacheStale(key);
+    if (stale) return { repos: stale, cachedAt: cacheRaw(key).ts, stale: true };
+    throw err;
+  }
 }
 
+// Optional server-baked stats.json (true language bytes, commit counts, private
+// repos). Absent on a vanilla deploy — that's fine, we just skip the extras.
+async function fetchStats() {
+  const key = "cd:stats";
+  try {
+    const res = await fetch(`stats.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    cacheSet(key, data);
+    return data;
+  } catch {
+    return cacheStale(key); // serve last-known if the fetch itself failed
+  }
+}
+
+// progress.md for one repo via raw.githubusercontent (NOT the rate-limited API).
 async function fetchTracker(repo) {
   const url = `https://raw.githubusercontent.com/${CFG.username}/${repo.name}/${repo.default_branch}/${CFG.trackerFile}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     return parseProgress(await res.text());
-  } catch { return null; }
-}
-
-// Build the merged model for all curated repos.
-async function loadProjects() {
-  const all = await fetchRepoList();
-  const byName = Object.fromEntries(all.map((r) => [r.name.toLowerCase(), r]));
-  const wanted = (CFG.repos && CFG.repos.length ? CFG.repos : all.map((r) => r.name));
-
-  const projects = [];
-  for (const name of wanted) {
-    const repo = byName[name.toLowerCase()];
-    if (!repo) continue; // skip names not found on the account
-    const tracker = await fetchTracker(repo);
-    projects.push(mergeProject(repo, tracker));
+  } catch {
+    return null;
   }
-  return projects;
 }
 
-// Baked data produced by the GitHub Action. Present in deployed/private setups.
-async function fetchBakedData() {
-  try {
-    const res = await fetch(`data.json?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data) && data.length ? data : null;
-  } catch { return null; }
+// Fetch every (non-archived, non-fork) repo's progress.md in parallel and cache
+// the result map. Runs AFTER first paint so the dashboard appears instantly.
+async function enrichTrackers() {
+  const key = `cd:trackers:${CFG.username}`;
+  const cached = cacheGet(key);
+  if (cached) {
+    applyTrackers(cached);
+    return;
+  }
+  const targets = STATE.projects.filter((p) => !p.archived && !p.fork);
+  const results = await Promise.all(
+    targets.map(async (p) => [p.name, await fetchTracker(p)])
+  );
+  const map = {};
+  for (const [name, tracker] of results) if (tracker) map[name] = tracker;
+  cacheSet(key, map);
+  applyTrackers(map);
 }
 
-// ─── Rendering ───────────────────────────────────────────────────────────────
-let STATE = { projects: [], filter: "all" };
-
-function allFeatures(projects) {
-  return projects.flatMap((p) => p.features.map((f) => ({ ...f, project: p.name })));
+function applyTrackers(map) {
+  for (const p of STATE.projects) {
+    const t = map[p.name];
+    if (t) {
+      p.tracker = t;
+      p.title = t.title || p.name;
+      if (t.description) p.description = p.description || t.description;
+    }
+  }
+  STATE.trackersLoaded = true;
 }
 
-function langDot(lang) {
-  if (!lang) return "";
-  const c = LANG_COLORS[lang] || "#86868b";
-  return `<span class="lang-dot" style="background:${c}"></span>`;
+// ─── Model ───────────────────────────────────────────────────────────────────
+function statusOf(repo) {
+  if (repo.archived) return "archived";
+  const d = daysSince(repo.pushed_at);
+  if (d <= ACTIVE_DAYS) return "active";
+  if (d <= STALE_DAYS) return "recent";
+  return "stale";
 }
 
-// Segmented language bar + legend from [{ name, pct }].
+function toModel(repo) {
+  return {
+    ...repo,
+    title: repo.name,
+    status: statusOf(repo),
+    tracker: null,
+    languages: null, // true byte breakdown, only from stats.json
+    commitCount: null,
+    lastCommit: null,
+  };
+}
+
+function mergeStats(stats) {
+  if (!stats || !stats.repos) return;
+  for (const p of STATE.projects) {
+    const s = stats.repos[p.name];
+    if (!s) continue;
+    if (s.languages) p.languages = s.languages;
+    if (s.commitCount != null) p.commitCount = s.commitCount;
+    if (s.lastCommit) p.lastCommit = s.lastCommit;
+  }
+}
+
+// Aggregate "languages I use most". Prefers true bytes baked in stats.json;
+// otherwise approximates from each repo's primary language (no extra API calls).
+function aggregateLanguages() {
+  if (STATE.stats && STATE.stats.languagesAgg && STATE.stats.languagesAgg.length) {
+    return STATE.stats.languagesAgg.slice(0, 6);
+  }
+  const counts = {};
+  for (const p of STATE.projects) {
+    if (p.fork && !CFG.includeForks) continue;
+    if (p.language) counts[p.language] = (counts[p.language] || 0) + 1;
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  if (!total) return [];
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, n]) => ({ name, pct: Math.round((n / total) * 100) }))
+    .filter((l) => l.pct > 0);
+}
+
+// Only repos we count as "mine to build": drops forks unless opted in.
+function visibleProjects() {
+  return STATE.projects.filter((p) => CFG.includeForks || !p.fork);
+}
+
+// ─── Shared bits ─────────────────────────────────────────────────────────────
+function statusBadge(status) {
+  return `<span class="status-badge ${status}">${STATUS_LABEL[status]}</span>`;
+}
+
 function langBar(langs) {
   if (!langs || !langs.length) return "";
-  const segs = langs.map((l) =>
-    `<span class="langbar-seg" style="width:${l.pct}%;background:${LANG_COLORS[l.name] || "#86868b"}" title="${esc(l.name)} ${l.pct}%"></span>`
-  ).join("");
-  const legend = langs.map((l) =>
-    `<span>${langDot(l.name)}${esc(l.name)} ${l.pct}%</span>`
-  ).join("");
+  const segs = langs
+    .map((l) => `<span class="langbar-seg" style="width:${l.pct}%;background:${LANG_COLORS[l.name] || "#86868b"}" title="${esc(l.name)} ${l.pct}%"></span>`)
+    .join("");
+  const legend = langs
+    .map((l) => `<span>${langDot(l.name)}${esc(l.name)} ${l.pct}%</span>`)
+    .join("");
   return `<div class="langbar">${segs}</div><div class="langbar-legend">${legend}</div>`;
 }
 
-function renderDashboard(projects) {
-  const feats = allFeatures(projects);
-  const count = (s) => feats.filter((f) => f.status === s).length;
-  const recent = [...projects].sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at)).slice(0, 8);
-  const totalCommits = projects.reduce((n, p) => n + (p.commitCount || 0), 0);
-
-  return `
-    <h1 class="page-title">${esc(CFG.ownerName || "My")}'s Builds</h1>
-    <p class="page-subtitle">Live progress across ${projects.length} project${projects.length === 1 ? "" : "s"}${totalCommits ? ` · ${totalCommits.toLocaleString()} commits` : ""}, straight from GitHub.</p>
-
-    <div class="stats">
-      <a class="stat-card" href="#/" style="text-decoration:none">
-        <div class="stat-num">${count("done")}</div>
-        <div class="stat-label"><span class="dot done"></span>Shipped</div>
-      </a>
-      <div class="stat-card">
-        <div class="stat-num">${count("in-progress")}</div>
-        <div class="stat-label"><span class="dot progress"></span>In Progress</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num">${count("planned")}</div>
-        <div class="stat-label"><span class="dot planned"></span>Planned</div>
-      </div>
-    </div>
-
-    <section class="section">
-      <div class="section-title">Recent Activity</div>
-      <div class="activity-strip">
-        ${recent.map((p) => `
-          <a class="activity-card" href="#/project/${encodeURIComponent(p.name)}">
-            <div class="activity-name">${esc(p.title)}</div>
-            <div class="activity-meta">
-              ${p.language ? `<span>${langDot(p.language)}${esc(p.language)}</span>` : ""}
-              ${p.commitCount ? `<span>${p.commitCount} commits</span>` : ""}
-              ${p.stars ? `<span>★ ${p.stars}</span>` : ""}
-              <span>${p.pushed_at ? timeAgo(p.pushed_at) : ""}</span>
-            </div>
-          </a>`).join("")}
-      </div>
-    </section>`;
-}
-
-function renderFilters(projects) {
-  const chips = ["all", ...projects.filter((p) => p.hasTracker).map((p) => p.name)];
-  return `
-    <section class="section">
-      <div class="section-title">Board</div>
-      <div class="filters">
-        ${chips.map((c) => `
-          <button class="chip ${STATE.filter === c ? "active" : ""}" data-filter="${esc(c)}">
-            ${c === "all" ? "All projects" : esc(c)}
-          </button>`).join("")}
-      </div>
-    </section>`;
-}
-
-function cardHTML(f) {
-  const css = STATUS[f.status].css;
-  return `
-    <a class="card" href="#/project/${encodeURIComponent(f.project)}">
-      <div class="status-bar ${css}"></div>
-      <div class="card-title">${esc(f.name)}</div>
-      ${f.note ? `<div class="card-note">${esc(f.note)}</div>` : ""}
-      <div class="card-foot"><span class="card-proj">${esc(f.project)}</span></div>
-    </a>`;
-}
-
-function renderKanban(projects) {
-  let feats = allFeatures(projects);
-  if (STATE.filter !== "all") feats = feats.filter((f) => f.project === STATE.filter);
-
-  const col = (statusKey, title) => {
-    const items = feats.filter((f) => f.status === statusKey);
-    const css = STATUS[statusKey].css;
-    return `
-      <div class="column">
-        <div class="column-head">
-          <div class="column-title"><span class="dot ${css}"></span>${title}</div>
-          <span class="column-count">${items.length}</span>
-        </div>
-        <div class="cards">
-          ${items.length ? items.map(cardHTML).join("") : `<div class="empty-col">Nothing here yet</div>`}
-        </div>
-      </div>`;
+function featureCounts() {
+  const all = visibleProjects().flatMap((p) => (p.tracker ? p.tracker.features : []));
+  return {
+    total: all.length,
+    done: all.filter((f) => f.status === "done").length,
+    "in-progress": all.filter((f) => f.status === "in-progress").length,
+    planned: all.filter((f) => f.status === "planned").length,
   };
+}
 
-  return `<div class="kanban">
-    ${col("planned", "Planned")}
-    ${col("in-progress", "In Progress")}
-    ${col("done", "Done")}
-  </div>`;
+// ─── Home ────────────────────────────────────────────────────────────────────
+let STATE = { projects: [], stats: null, cachedAt: 0, showDormant: false, trackersLoaded: false };
+
+function snapshotHTML(projects) {
+  const active = projects.filter((p) => p.status === "active").length;
+  const langs = new Set(projects.filter((p) => p.language).map((p) => p.language));
+  const lastPush = projects.reduce((m, p) => (p.pushed_at > m ? p.pushed_at : m), "");
+  const tile = (num, label) => `<div class="snap-tile"><div class="snap-num">${num}</div><div class="snap-label">${label}</div></div>`;
+  return `
+    <section class="snapshot">
+      ${tile(projects.length, projects.length === 1 ? "Repository" : "Repositories")}
+      ${tile(active, `Active · ${ACTIVE_DAYS}d`)}
+      ${tile(langs.size, langs.size === 1 ? "Language" : "Languages")}
+      ${tile(lastPush ? timeAgo(lastPush) : "—", "Last pushed")}
+    </section>`;
+}
+
+function activityHTML(projects) {
+  const recent = projects
+    .filter((p) => p.status === "active" || p.status === "recent")
+    .sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at))
+    .slice(0, 6);
+
+  const body = recent.length
+    ? `<div class="activity-grid">${recent.map(activityCard).join("")}</div>`
+    : `<p class="empty-note">Nothing pushed in the last ${STALE_DAYS} days.</p>`;
+
+  return `<section class="section">
+    <div class="section-head"><h2 class="section-title">Currently working on</h2></div>
+    ${body}
+  </section>`;
+}
+
+function activityCard(p) {
+  return `<a class="activity-card ${p.status}" href="#/project/${encodeURIComponent(p.name)}">
+    <div class="activity-row">
+      ${langDot(p.language)}
+      <span class="activity-name">${esc(p.title)}</span>
+      ${statusBadge(p.status)}
+    </div>
+    ${p.description ? `<p class="activity-desc">${esc(p.description)}</p>` : ""}
+    <div class="activity-meta">
+      <span>pushed ${timeAgo(p.pushed_at)}</span>
+      ${p.openIssues ? `<span>${p.openIssues} open issue${p.openIssues === 1 ? "" : "s"}</span>` : ""}
+    </div>
+  </a>`;
+}
+
+function langMixHTML() {
+  const langs = aggregateLanguages();
+  if (!langs.length) return "";
+  return `<section class="section">
+    <div class="section-head"><h2 class="section-title">Languages</h2></div>
+    ${langBar(langs)}
+  </section>`;
+}
+
+// Progress summary — rendered ONLY when real progress.md files exist.
+function progressHTML() {
+  const c = featureCounts();
+  if (!c.total) return "";
+  const card = (num, css, label) => `
+    <div class="stat-card">
+      <div class="stat-num">${num}</div>
+      <div class="stat-label"><span class="dot ${css}"></span>${label}</div>
+    </div>`;
+  return `<section class="section">
+    <div class="section-head"><h2 class="section-title">Progress · from your progress.md files</h2></div>
+    <div class="stats">
+      ${card(c.done, "done", "Shipped")}
+      ${card(c["in-progress"], "progress", "In Progress")}
+      ${card(c.planned, "planned", "Planned")}
+    </div>
+  </section>`;
+}
+
+function projectCard(p) {
+  const meta = [
+    p.language ? `${langDot(p.language)}${esc(p.language)}` : "",
+    p.stars ? `★ ${p.stars}` : "",
+    p.openIssues ? `${p.openIssues} issue${p.openIssues === 1 ? "" : "s"}` : "",
+    `pushed ${timeAgo(p.pushed_at)}`,
+  ].filter(Boolean);
+
+  return `<article class="project-card ${p.status}">
+    <div class="project-card-head">
+      ${langDot(p.language)}
+      <h3 class="project-name">${esc(p.title)}</h3>
+      ${statusBadge(p.status)}
+    </div>
+    <p class="project-desc">${p.description ? esc(p.description) : "<span class='muted'>No description</span>"}</p>
+    <div class="project-meta">${meta.map((m) => `<span>${m}</span>`).join("")}</div>
+    <div class="project-actions">
+      <a class="project-link" href="#/project/${encodeURIComponent(p.name)}">Details →</a>
+      <a class="project-link ghost" href="${esc(p.url)}" target="_blank" rel="noopener">GitHub ↗</a>
+      ${p.homepage ? `<a class="project-link ghost" href="${esc(p.homepage)}" target="_blank" rel="noopener">Live ↗</a>` : ""}
+    </div>
+  </article>`;
+}
+
+function projectsHTML(projects) {
+  const live = projects.filter((p) => p.status === "active" || p.status === "recent");
+  const dormant = projects.filter((p) => p.status === "stale" || p.status === "archived");
+  const byPush = (a, b) => new Date(b.pushed_at) - new Date(a.pushed_at);
+  live.sort(byPush);
+  dormant.sort(byPush);
+
+  const dormantBlock = dormant.length
+    ? `<button class="dormant-toggle" data-toggle="dormant">
+         ${STATE.showDormant ? "Hide" : "Show"} dormant (${dormant.length})
+       </button>
+       ${STATE.showDormant ? `<div class="project-grid dormant">${dormant.map(projectCard).join("")}</div>` : ""}`
+    : "";
+
+  return `<section class="section">
+    <div class="section-head"><h2 class="section-title">All projects</h2></div>
+    ${live.length ? `<div class="project-grid">${live.map(projectCard).join("")}</div>` : `<p class="empty-note">No active projects in the last ${STALE_DAYS} days.</p>`}
+    ${dormantBlock}
+  </section>`;
 }
 
 function renderHome() {
-  const p = STATE.projects;
-  const noTracked = p.every((x) => !x.hasTracker);
-  APP.innerHTML = `<div class="fade-in">
-    ${renderDashboard(p)}
-    ${noTracked ? `<div class="banner">No <code>${esc(CFG.trackerFile)}</code> found in your repos yet. Add one (see the sample) and the board fills in automatically.</div>` : ""}
-    ${renderFilters(p)}
-    ${renderKanban(p)}
+  const projects = visibleProjects();
+
+  if (!projects.length) {
+    APP.innerHTML = `<div class="dash fade-in">
+      ${dashHead()}
+      <div class="empty-state">
+        <p>No public repositories found for <code>@${esc(CFG.username)}</code> yet.</p>
+        <p class="muted">Create a public repo and it'll appear here automatically.</p>
+      </div>
+    </div>`;
+    return;
+  }
+
+  APP.innerHTML = `<div class="dash fade-in">
+    ${dashHead()}
+    ${snapshotHTML(projects)}
+    ${activityHTML(projects)}
+    ${langMixHTML()}
+    ${progressHTML()}
+    ${projectsHTML(projects)}
+    ${refreshNote()}
   </div>`;
 
-  APP.querySelectorAll(".chip").forEach((btn) =>
-    btn.addEventListener("click", () => { STATE.filter = btn.dataset.filter; renderHome(); })
-  );
+  const toggle = APP.querySelector('[data-toggle="dormant"]');
+  if (toggle) toggle.addEventListener("click", () => { STATE.showDormant = !STATE.showDormant; renderHome(); });
 }
 
-function renderProject(name) {
+function dashHead() {
+  return `<header class="dash-head">
+    <h1 class="dash-title">${esc(CFG.ownerName || CFG.username)}</h1>
+    ${CFG.tagline ? `<p class="dash-tagline">${esc(CFG.tagline)}</p>` : ""}
+  </header>`;
+}
+
+function refreshNote() {
+  const when = STATE.cachedAt ? timeAgo(new Date(STATE.cachedAt).toISOString()) : "just now";
+  const stale = STATE.stale ? " · showing cached data (GitHub rate limit)" : "";
+  return `<p class="refresh-note">Auto-discovered from the GitHub API · cached ${when}${stale}</p>`;
+}
+
+// ─── Project detail ──────────────────────────────────────────────────────────
+async function renderProject(name) {
   const p = STATE.projects.find((x) => x.name.toLowerCase() === name.toLowerCase());
   if (!p) { location.hash = "#/"; return; }
 
-  const total = p.features.length;
-  const done = p.features.filter((f) => f.status === "done").length;
+  // Lazy-load this repo's progress.md if the background pass hasn't reached it.
+  if (!p.tracker && !p.archived && !p.fork) {
+    const t = await fetchTracker(p);
+    if (t) { p.tracker = t; p.title = t.title || p.name; if (t.description) p.description = p.description || t.description; }
+  }
+
+  const tracker = p.tracker;
+  const stack = tracker && tracker.stack.length ? tracker.stack : (p.language ? [p.language] : []);
+  const total = tracker ? tracker.features.length : 0;
+  const done = tracker ? tracker.features.filter((f) => f.status === "done").length : 0;
   const pct = total ? Math.round((done / total) * 100) : 0;
 
   APP.innerHTML = `<div class="fade-in">
     <a class="back-link" href="#/">← All projects</a>
-    <h1 class="page-title">${esc(p.title)}</h1>
+    <div class="detail-head">
+      <h1 class="page-title">${esc(p.title)}</h1>
+      ${statusBadge(p.status)}
+    </div>
     ${p.description ? `<p class="page-subtitle">${esc(p.description)}</p>` : ""}
     <div class="detail-meta">
       ${p.language ? `<span>${langDot(p.language)}${esc(p.language)}</span>` : ""}
       ${p.commitCount != null ? `<span>${p.commitCount.toLocaleString()} commits</span>` : ""}
-      ${p.stars ? `<span>★ ${p.stars} stars</span>` : ""}
-      ${p.forks ? `<span>⑂ ${p.forks} forks</span>` : ""}
+      ${p.stars ? `<span>★ ${p.stars} star${p.stars === 1 ? "" : "s"}</span>` : ""}
+      ${p.forks ? `<span>⑂ ${p.forks} fork${p.forks === 1 ? "" : "s"}</span>` : ""}
       ${p.openIssues ? `<span>${p.openIssues} open issue${p.openIssues === 1 ? "" : "s"}</span>` : ""}
       ${p.created_at ? `<span>Started ${timeAgo(p.created_at)}</span>` : ""}
       ${p.pushed_at ? `<span>Updated ${timeAgo(p.pushed_at)}</span>` : ""}
       <span><a style="color:var(--accent)" href="${esc(p.url)}" target="_blank" rel="noopener">View on GitHub ↗</a></span>
+      ${p.homepage ? `<span><a style="color:var(--accent)" href="${esc(p.homepage)}" target="_blank" rel="noopener">Live site ↗</a></span>` : ""}
     </div>
 
     ${p.lastCommit ? `
@@ -274,51 +464,51 @@ function renderProject(name) {
 
     ${p.topics && p.topics.length ? `<div class="topics">${p.topics.map((t) => `<span class="topic-chip">${esc(t)}</span>`).join("")}</div>` : ""}
 
-    ${p.stack.length ? `<div class="stack">${p.stack.map((s) => `<span class="stack-chip">${esc(s)}</span>`).join("")}</div>` : ""}
+    ${stack.length ? `<div class="stack">${stack.map((s) => `<span class="stack-chip">${esc(s)}</span>`).join("")}</div>` : ""}
 
-    ${p.hasTracker ? `
+    ${tracker && total ? `
       <div class="progress-wrap">
         <div class="progress-head"><span>${done} of ${total} features shipped</span><span>${pct}%</span></div>
         <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
       </div>
       <div class="checklist">
-        ${p.features.map((f) => {
-          const css = STATUS[f.status].css;
-          const mark = f.status === "done" ? "✓" : f.status === "in-progress" ? "•" : "";
-          return `
-            <div class="check-item ${css}">
-              <div class="check-mark ${css}">${mark}</div>
-              <div class="check-body">
-                <div class="check-name">${esc(f.name)}</div>
-                ${f.note ? `<div class="check-note">${esc(f.note)}</div>` : ""}
-              </div>
-              <span class="check-status ${css}">${STATUS[f.status].label}</span>
-            </div>`;
-        }).join("")}
+        ${tracker.features.map(checkItem).join("")}
       </div>`
-    : `<div class="no-tracker">This project doesn't have a <code>${esc(CFG.trackerFile)}</code> file yet, so there's no feature breakdown. Add one to its repo root to track progress here.</div>`}
+    : `<div class="no-tracker">No <code>${esc(CFG.trackerFile)}</code> in this repo, so there's no feature breakdown. Add one to its root to track progress here.</div>`}
+  </div>`;
+}
+
+function checkItem(f) {
+  const css = f.status === "done" ? "done" : f.status === "in-progress" ? "progress" : "planned";
+  const label = f.status === "done" ? "Done" : f.status === "in-progress" ? "In Progress" : "Planned";
+  const mark = f.status === "done" ? "✓" : f.status === "in-progress" ? "•" : "";
+  return `<div class="check-item ${css}">
+    <div class="check-mark ${css}">${mark}</div>
+    <div class="check-body">
+      <div class="check-name">${esc(f.name)}</div>
+      ${f.note ? `<div class="check-note">${esc(f.note)}</div>` : ""}
+    </div>
+    <span class="check-status ${css}">${label}</span>
   </div>`;
 }
 
 // ─── Router ──────────────────────────────────────────────────────────────────
 function route() {
-  const hash = location.hash || "#/";
-  const m = hash.match(/^#\/project\/(.+)$/);
+  const m = (location.hash || "#/").match(/^#\/project\/(.+)$/);
   if (m) renderProject(decodeURIComponent(m[1]));
   else renderHome();
 }
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 function initTheme() {
-  const saved = localStorage.getItem("bt:theme");
-  const prefersDark = matchMedia("(prefers-color-scheme: dark)").matches;
-  const theme = saved || (prefersDark ? "dark" : "light");
+  const saved = localStorage.getItem("cd:theme");
+  const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
   document.documentElement.dataset.theme = theme;
   updateThemeIcon(theme);
   document.getElementById("theme-toggle").addEventListener("click", () => {
     const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    localStorage.setItem("bt:theme", next);
+    localStorage.setItem("cd:theme", next);
     updateThemeIcon(next);
   });
 }
@@ -329,36 +519,34 @@ function updateThemeIcon(theme) {
 // ─── Boot ────────────────────────────────────────────────────────────────────
 async function boot() {
   initTheme();
-  document.getElementById("brand-name").textContent = `${CFG.ownerName || "My"} · Builds`;
-  const gh = document.getElementById("github-link");
-  gh.href = `https://github.com/${CFG.username}`;
+  document.getElementById("brand-name").textContent = CFG.ownerName || CFG.username || "Dashboard";
+  document.getElementById("github-link").href = `https://github.com/${CFG.username}`;
 
   if (!CFG.username || CFG.username === "your-github-username") {
     APP.innerHTML = `<div class="banner" style="margin-top:48px">
-      Set your GitHub username in <code>config.js</code> to load the board.
+      Set your GitHub username in <code>config.js</code> to load the dashboard.
     </div>`;
     return;
   }
 
-  // 1) Prefer baked data.json (works for private repos, no token in browser).
-  const baked = await fetchBakedData();
-  if (baked) {
-    STATE.projects = baked;
-    window.addEventListener("hashchange", route);
-    route();
-    return;
-  }
-
-  // 2) Fall back to the live GitHub API (public repos only).
   try {
-    STATE.projects = await loadProjects();
+    const [{ repos, cachedAt, stale }, stats] = await Promise.all([fetchRepos(), fetchStats()]);
+    STATE.projects = repos.map(toModel);
+    STATE.cachedAt = cachedAt;
+    STATE.stale = stale;
+    STATE.stats = stats;
+    if (stats) mergeStats(stats);
+
     window.addEventListener("hashchange", route);
-    route();
+    route(); // paint immediately from the one API call
+
+    // Progressive enhancement: pull progress.md files, then refresh the view.
+    enrichTrackers().then(() => route()).catch(() => {});
   } catch (err) {
     APP.innerHTML = `<div class="banner" style="margin-top:48px">
-      No <code>data.json</code> yet, and the live GitHub API returned: ${esc(err.message)}.
-      ${String(err.message).includes("404") || String(err.message).includes("403")
-        ? "If your repos are private, run the GitHub Action (or <code>node build/fetch.cjs</code>) to bake <code>data.json</code> — see the README."
+      Couldn't load repos for <code>@${esc(CFG.username)}</code>: ${esc(err.message)}.
+      ${String(err.message).includes("403")
+        ? "GitHub's unauthenticated rate limit (60/hr) may be exhausted — try again shortly."
         : "Check the username in <code>config.js</code>."}
     </div>`;
   }

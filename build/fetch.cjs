@@ -1,58 +1,85 @@
 #!/usr/bin/env node
-// ─── Bake data.json from GitHub (server-side) ─────────────────────────────────
-// Reads each curated repo's metadata + progress.md using an authenticated token,
-// then writes build-tracker/data.json. The token stays here (CI secret / local
-// env) and never reaches the browser, so PRIVATE repos work and stay private.
+// ─── Bake stats.json (OPTIONAL server-side enrichment) ───────────────────────
+// The dashboard works with ZERO setup — it auto-discovers public repos live from
+// the browser. This script is the optional richer layer: using a server-side
+// token (CI secret / local env, NEVER shipped to the browser), it bakes a
+// stats.json with data the unauthenticated API can't cheaply give the client:
+//   • true language BYTE breakdown (per repo + aggregate)
+//   • commit counts and the latest commit per repo
+// The site reads stats.json if present and merges it in; if it's absent, those
+// extras simply don't render. No fake data, ever.
 //
-// Usage:  GITHUB_TOKEN=ghp_xxx node build/fetch.cjs
-// Token needs read-only "Contents" + "Metadata" on the listed repos.
+// Privacy: only PUBLIC repos are baked, so nothing private leaks into the file
+// the public site reads. Flip BAKE_PRIVATE below if you host the site privately.
+//
+// Usage:  TRACKER_TOKEN=github_pat_xxx node build/fetch.cjs
+// Token needs read-only Contents + Metadata on your repos.
 
 const fs = require("fs");
 const path = require("path");
 const CFG = require("../config.js");
-const { parseProgress, mergeProject } = require("../parser.js");
 
 const TOKEN = process.env.TRACKER_TOKEN || process.env.GITHUB_TOKEN || "";
-const OUT = path.join(__dirname, "..", "data.json");
+const OUT = path.join(__dirname, "..", "stats.json");
+const BAKE_PRIVATE = false; // keep false for public-hosted sites
 
 if (!TOKEN) {
   console.error("✗ No token. Set TRACKER_TOKEN or GITHUB_TOKEN.");
   process.exit(1);
 }
 
-const gh = async (url) => {
-  const res = await fetch(url, {
+const gh = async (url) =>
+  fetch(url, {
     headers: {
       Authorization: `Bearer ${TOKEN}`,
       Accept: "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "build-tracker",
+      "User-Agent": "coder-dashboard",
     },
   });
-  return res;
-};
 
-// Language byte breakdown → top few { name, pct }. Null on failure.
-async function fetchLanguages(name) {
+// Auto-discover every repo for the user (paginated). No hardcoded list.
+async function discoverRepos() {
+  const repos = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = await gh(
+      `https://api.github.com/users/${CFG.username}/repos?per_page=100&page=${page}&sort=pushed`
+    );
+    if (!res.ok) throw new Error(`repo discovery failed: ${res.status}`);
+    const batch = await res.json();
+    repos.push(...batch);
+    if (batch.length < 100) break;
+  }
+  return repos.filter((r) => {
+    if (!BAKE_PRIVATE && r.private) return false;
+    if (r.fork && !CFG.includeForks) return false;
+    return true;
+  });
+}
+
+// Raw { language: bytes } map for one repo.
+async function languageBytes(name) {
   try {
     const res = await gh(`https://api.github.com/repos/${CFG.username}/${name}/languages`);
-    if (!res.ok) return null;
-    const map = await res.json();
-    const total = Object.values(map).reduce((a, b) => a + b, 0);
-    if (!total) return null;
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([lang, bytes]) => ({ name: lang, pct: Math.round((bytes / total) * 100) }))
-      .filter((l) => l.pct > 0);
+    if (!res.ok) return {};
+    return await res.json();
   } catch {
-    return null;
+    return {};
   }
 }
 
-// Latest commit (first line + date + url) and total commit count (via the
-// Link header's last-page number). Returns nulls on failure.
-async function fetchLastCommit(name, branch) {
+function topLanguages(bytes, n = 4) {
+  const total = Object.values(bytes).reduce((a, b) => a + b, 0);
+  if (!total) return null;
+  return Object.entries(bytes)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([name, b]) => ({ name, pct: Math.round((b / total) * 100) }))
+    .filter((l) => l.pct > 0);
+}
+
+// Latest commit + total commit count (via the Link header's last-page number).
+async function commitInfo(name, branch) {
   try {
     const res = await gh(
       `https://api.github.com/repos/${CFG.username}/${name}/commits?per_page=1&sha=${branch}`
@@ -77,60 +104,26 @@ async function fetchLastCommit(name, branch) {
   }
 }
 
-async function fetchRepo(name) {
-  const metaRes = await gh(`https://api.github.com/repos/${CFG.username}/${name}`);
-  if (!metaRes.ok) {
-    console.warn(`  ! ${name}: repo fetch ${metaRes.status} — skipped`);
-    return null;
-  }
-  const r = await metaRes.json();
-  const [languages, commitInfo] = await Promise.all([
-    fetchLanguages(name),
-    fetchLastCommit(name, r.default_branch),
-  ]);
-  const repo = {
-    name: r.name,
-    description: r.description,
-    language: r.language,
-    stars: r.stargazers_count,
-    url: r.html_url,
-    pushed_at: r.pushed_at,
-    created_at: r.created_at,
-    forks: r.forks_count,
-    openIssues: r.open_issues_count,
-    topics: r.topics || [],
-    languages,
-    lastCommit: commitInfo.lastCommit,
-    commitCount: commitInfo.commitCount,
-  };
-
-  // progress.md via the contents API (base64). 404 = no tracker file yet.
-  let tracker = null;
-  const fileRes = await gh(
-    `https://api.github.com/repos/${CFG.username}/${name}/contents/${CFG.trackerFile}`
-  );
-  if (fileRes.ok) {
-    const body = await fileRes.json();
-    const text = Buffer.from(body.content, body.encoding || "base64").toString("utf8");
-    tracker = parseProgress(text);
-  } else if (fileRes.status !== 404) {
-    console.warn(`  ! ${name}: ${CFG.trackerFile} fetch ${fileRes.status}`);
-  }
-
-  console.log(`  ✓ ${name}${tracker ? ` (${tracker.features.length} features)` : " (no tracker)"}`);
-  return mergeProject(repo, tracker);
-}
-
 (async () => {
-  console.log(`Baking data.json for ${CFG.username} (${CFG.repos.length} repos)…`);
-  const projects = [];
-  for (const name of CFG.repos) {
-    const p = await fetchRepo(name);
-    if (p) projects.push(p);
+  console.log(`Baking stats.json for ${CFG.username}…`);
+  const repos = await discoverRepos();
+  console.log(`  discovered ${repos.length} repo(s)`);
+
+  const out = { generatedAt: new Date().toISOString(), languagesAgg: [], repos: {} };
+  const totalBytes = {};
+
+  for (const r of repos) {
+    const bytes = await languageBytes(r.name);
+    for (const [lang, b] of Object.entries(bytes)) totalBytes[lang] = (totalBytes[lang] || 0) + b;
+    const { lastCommit, commitCount } = await commitInfo(r.name, r.default_branch);
+    out.repos[r.name] = { languages: topLanguages(bytes), commitCount, lastCommit };
+    console.log(`  ✓ ${r.name}`);
   }
-  fs.writeFileSync(OUT, JSON.stringify(projects, null, 2) + "\n");
-  console.log(`Wrote ${OUT} (${projects.length} projects).`);
+
+  out.languagesAgg = topLanguages(totalBytes, 6) || [];
+  fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + "\n");
+  console.log(`Wrote ${OUT} (${repos.length} repos, ${out.languagesAgg.length} aggregate languages).`);
 })().catch((err) => {
-  console.error("✗ Build failed:", err.message);
+  console.error("✗ Bake failed:", err.message);
   process.exit(1);
 });

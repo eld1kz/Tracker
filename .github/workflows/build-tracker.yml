@@ -1,23 +1,22 @@
-name: Build Tracker data
+name: Coder Dashboard stats
 
-# Re-bakes data.json from the tracked repos' progress.md files.
-# The token lives only here (Actions secret) — never in the deployed page,
-# so private repos work and stay private.
+# Bakes the OPTIONAL stats.json (true language bytes, commit counts, latest
+# commit per repo). The dashboard works without this — it's pure enrichment.
+# The token lives only here (Actions secret), never in the deployed page.
 
 on:
   push:
     branches: [main]
     paths:
       - "config.js"
-      - "parser.js"
       - "build/**"
       - ".github/workflows/build-tracker.yml"
   schedule:
-    - cron: "0 */6 * * *" # every 6 hours: picks up progress.md edits in tracked repos
+    - cron: "0 */6 * * *" # every 6 hours: refresh commit counts / language bytes
   workflow_dispatch: {}
 
 permissions:
-  contents: write # to commit data.json back
+  contents: write # to commit stats.json back
 
 jobs:
   bake:
@@ -29,26 +28,27 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Bake data.json
+      - name: Bake stats.json
         env:
-          # Fine-grained PAT with read-only Contents + Metadata on every repo in
-          # config.js. Add it under Settings → Secrets → Actions as TRACKER_TOKEN.
+          # Fine-grained PAT with read-only Contents + Metadata on your repos.
+          # Add it under Settings → Secrets → Actions as TRACKER_TOKEN.
+          # Optional: with no secret, the dashboard still works (live fetch).
           TRACKER_TOKEN: ${{ secrets.TRACKER_TOKEN }}
         run: |
           if [ -z "$TRACKER_TOKEN" ]; then
-            echo "::notice::TRACKER_TOKEN secret not set — add it to enable baking. Skipping."
+            echo "::notice::TRACKER_TOKEN secret not set — skipping optional stats bake."
             exit 0
           fi
           node build/fetch.cjs
 
-      - name: Commit data.json if changed
+      - name: Commit stats.json if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet -- data.json; then
-            git add data.json
-            git commit -m "chore: refresh build-tracker data [skip ci]"
+          if ! git diff --quiet -- stats.json; then
+            git add stats.json
+            git commit -m "chore: refresh dashboard stats [skip ci]"
             git push
           else
-            echo "No changes to data.json."
+            echo "No changes to stats.json."
           fi
