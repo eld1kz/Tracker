@@ -46,10 +46,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet -- data.json; then
-            git add data.json
+          git add data.json
+          # --cached catches a brand-new (untracked) data.json too, which a plain
+          # `git diff` would miss.
+          if git diff --cached --quiet; then
+            echo "No changes to data.json."
+          else
             git commit -m "chore: refresh dashboard data [skip ci]"
             git push
-          else
-            echo "No changes to data.json."
           fi
