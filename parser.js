@@ -32,18 +32,33 @@
       body = text.slice(fm[0].length);
     }
 
-    body.split("\n").forEach((line) => {
-      const m = line.match(/^\s*-\s*\[([^\]]*)\]\s*(.+)$/);
-      if (!m) return;
-      const status = normStatus(m[1]);
-      let name = m[2].trim();
+    // Split "name — note" on an em/en dash or hyphen separator.
+    function splitNote(raw) {
+      let name = raw.trim();
       let note = "";
-      const split = name.split(/\s+[—–-]\s+/); // em/en dash or hyphen separator
+      const split = name.split(/\s+[—–-]\s+/);
       if (split.length > 1) {
         name = split[0].trim();
         note = split.slice(1).join(" — ").trim();
       }
-      features.push({ name, note, status });
+      return { name, note };
+    }
+
+    let lastFeature = null;
+    body.split("\n").forEach((line) => {
+      // Capture leading whitespace to decide nesting (2+ spaces or a tab = subtask).
+      const m = line.match(/^([ \t]*)-\s*\[([^\]]*)\]\s*(.+)$/);
+      if (!m) return;
+      const indent = m[1];
+      const status = normStatus(m[2]);
+      const { name, note } = splitNote(m[3]);
+      const indented = /\t/.test(indent) || indent.length >= 2;
+      if (indented && lastFeature) {
+        lastFeature.subtasks.push({ name, note, status });
+      } else {
+        lastFeature = { name, note, status, subtasks: [] };
+        features.push(lastFeature);
+      }
     });
 
     const stack = meta.stack ? meta.stack.split(",").map((s) => s.trim()).filter(Boolean) : [];
