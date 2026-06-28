@@ -142,10 +142,16 @@ No build step, no secrets in the page.
 
 ## Suggested next steps
 
-1. Command palette (Cmd/Ctrl-K) for type-to-jump across projects/features — the
-   research's single highest-leverage navigation add.
-2. Breadcrumbs + deep-linkable feature URLs (`#/p/{repo}/f/{n}`).
+1. ~~Command palette (Cmd/Ctrl-K) for type-to-jump across projects/features.~~
+   **Done** — `⌘K`/`Ctrl-K` (or the `⌕` header button) opens a modal indexing
+   every project + feature; type to filter, ↑/↓ + ↵ to jump, esc to close.
+2. ~~Breadcrumbs + deep-linkable feature URLs.~~ **Done** — feature URLs are
+   `#/project/{repo}/f/{n}`; opening one shows a breadcrumb trail and focuses
+   (expands + flashes) the target feature in List view.
 3. Add nested sub-tasks to more `progress.md` files to exercise the new parser
    (only `schub_friday`'s is currently flat).
-4. Owner avatar in the header (already baked into `data.json.owner`).
-5. Refine "key files" selection to prefer entry points over dotfiles.
+4. ~~Owner avatar in the header.~~ **Done** — rendered in the dashboard head
+   from `data.json.owner.avatarUrl` (baked path only).
+5. ~~Refine "key files" selection to prefer entry points over dotfiles.~~
+   **Done** — `rankKeyFiles()` ranks entry points + source/manifests above
+   dotfiles and license/changelog noise.

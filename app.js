@@ -237,9 +237,15 @@ let STATE = {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 function dashHead() {
   const o = STATE.owner;
+  const avatar = o && o.avatarUrl
+    ? `<img class="dash-avatar" src="${esc(o.avatarUrl)}" alt="" width="64" height="64" loading="lazy" />`
+    : "";
   return `<header class="dash-head">
-    <h1 class="dash-title">${esc((o && o.name) || CFG.ownerName || CFG.username)}</h1>
-    ${CFG.tagline ? `<p class="dash-tagline">${esc(CFG.tagline)}</p>` : ""}
+    ${avatar}
+    <div class="dash-head-text">
+      <h1 class="dash-title">${esc((o && o.name) || CFG.ownerName || CFG.username)}</h1>
+      ${CFG.tagline ? `<p class="dash-tagline">${esc(CFG.tagline)}</p>` : ""}
+    </div>
   </header>`;
 }
 function snapshotHTML(projects) {
@@ -371,7 +377,7 @@ function refreshNote() {
 }
 
 // ─── Project detail ──────────────────────────────────────────────────────────
-async function renderProject(name) {
+async function renderProject(name, opts = {}) {
   const p = STATE.projects.find((x) => x.name.toLowerCase() === name.toLowerCase());
   if (!p) { location.hash = "#/"; return; }
 
@@ -386,12 +392,21 @@ async function renderProject(name) {
     } catch { p._enriched = true; }
   }
 
-  const view = STATE.view[p.name] || "list";
   const hasFeatures = p.tracker && p.tracker.features.length;
+  // Deep-linked feature forces the List view so the target is visible.
+  const focusFeat = opts.feature != null && hasFeatures && opts.feature < p.tracker.features.length ? opts.feature : null;
+  const view = focusFeat != null ? "list" : (STATE.view[p.name] || "list");
   const links = detailLinks(p);
+  const ph = `#/project/${encodeURIComponent(p.name)}`;
+  const crumbs = `<nav class="breadcrumbs">
+    <a href="#/">All projects</a><span class="crumb-sep">/</span>
+    ${focusFeat != null
+      ? `<a href="${ph}">${esc(p.title)}</a><span class="crumb-sep">/</span><span class="crumb-current">${esc(p.tracker.features[focusFeat].name)}</span>`
+      : `<span class="crumb-current">${esc(p.title)}</span>`}
+  </nav>`;
 
   APP.innerHTML = `<div class="detail fade-in">
-    <a class="back-link" href="#/">← All projects</a>
+    ${crumbs}
     <div class="detail-head"><h1 class="page-title">${esc(p.title)}</h1>${statusBadge(p.status)}</div>
     <p class="detail-summary">${esc(p.summary || p.description || "No description")} ${p.summarySource ? sourceTag(p.summarySource) : ""}</p>
     <div class="detail-meta">
@@ -420,18 +435,47 @@ async function renderProject(name) {
   </div>`;
 
   bindDetail(p);
+  if (focusFeat != null) focusFeature(p, focusFeat);
+}
+function focusFeature(p, i) {
+  STATE.openFeatures[`${p.name}#${i}`] = true;
+  const item = APP.querySelector(`.feature-item[data-feat="${i}"]`);
+  if (!item) return;
+  item.classList.add("open", "flash");
+  item.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => item.classList.remove("flash"), 1600);
 }
 function loadingHTML(msg) { return `<div class="loading"><div class="spinner"></div><p>${msg}</p></div>`; }
 
 function detailLinks(p) {
   const out = [];
   if (p.readmeUrl) out.push(`<a class="detail-link" href="${esc(p.readmeUrl)}" target="_blank" rel="noopener">📄 README</a>`);
-  // a couple of "key files" from the tree
-  const key = (p.fileTree || []).filter((e) => e.type === "file" && !/^readme/i.test(e.path)).slice(0, 3);
+  // a couple of "key files" — prefer entry points & source over dotfiles/config
+  const key = rankKeyFiles(p.fileTree).slice(0, 3);
   for (const f of key) out.push(`<a class="detail-link" href="${esc(p.url)}/blob/${esc(p.default_branch)}/${esc(f.path)}" target="_blank" rel="noopener">${esc(f.path)}</a>`);
   out.push(`<a class="detail-link" href="${esc(p.url)}/commits" target="_blank" rel="noopener">Commits ↗</a>`);
   out.push(`<a class="detail-link" href="${esc(p.url)}" target="_blank" rel="noopener">Repo ↗</a>`);
   return out.join("");
+}
+
+// Rank a repo's files so "key files" surfaces real entry points, not dotfiles.
+const ENTRY_FILES = ["main.py", "app.py", "index.js", "index.ts", "app.js", "main.js",
+  "main.ts", "server.js", "main.go", "main.rs", "app.tsx", "index.html", "main.swift", "app.swift"];
+const SRC_EXT = [".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".swift", ".java", ".rb", ".php", ".c", ".cpp", ".kt"];
+function rankKeyFiles(tree) {
+  const files = (tree || []).filter((e) => e.type === "file" && !/^readme/i.test(e.path));
+  const base = (p) => p.split("/").pop().toLowerCase();
+  const score = (e) => {
+    const b = base(e.path);
+    if (b.startsWith(".")) return -100;                  // dotfiles last
+    if (ENTRY_FILES.includes(b)) return 100;             // known entry points first
+    let s = 0;
+    if (MANIFEST_NAMES.includes(b)) s += 40;             // manifests are meaningful
+    if (SRC_EXT.some((x) => b.endsWith(x))) s += 30;
+    if (/^(license|licence|changelog)$/i.test(b.replace(/\.[^.]+$/, ""))) s -= 30;
+    return s;
+  };
+  return files.map((e) => ({ e, s: score(e) })).sort((a, b) => b.s - a.s).map((x) => x.e);
 }
 
 function featureView(p, view) {
@@ -494,11 +538,104 @@ function bindDetail(p) {
   if (mm && window.MindMap) window.MindMap.render(mm, p);
 }
 
+// ─── Command palette (Cmd/Ctrl-K) ────────────────────────────────────────────
+// Type-to-jump across every project and feature. Built from current STATE, so it
+// reflects whatever's loaded (baked or live-enriched). No deps, no API calls.
+let PALETTE = { open: false, query: "", items: [], results: [], active: 0 };
+
+function paletteIndex() {
+  const items = [];
+  for (const p of visibleProjects()) {
+    items.push({ kind: "project", label: p.title, sub: p.summary || p.language || "",
+      hash: `#/project/${encodeURIComponent(p.name)}` });
+    if (p.tracker && p.tracker.features) {
+      p.tracker.features.forEach((f, i) => items.push({ kind: "feature", label: f.name,
+        sub: `${p.title} · ${FEAT_LABEL[f.status]}`,
+        hash: `#/project/${encodeURIComponent(p.name)}/f/${i}` }));
+    }
+  }
+  return items;
+}
+function buildPaletteDOM() {
+  if (document.getElementById("palette")) return;
+  const el = document.createElement("div");
+  el.id = "palette";
+  el.className = "palette-overlay hidden";
+  el.innerHTML = `<div class="palette" role="dialog" aria-modal="true" aria-label="Quick jump">
+    <input class="palette-input" type="text" placeholder="Jump to a project or feature…" aria-label="Search projects and features" />
+    <ul class="palette-results"></ul>
+    <div class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+  </div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", (e) => { if (e.target === el) closePalette(); });
+  const input = el.querySelector(".palette-input");
+  input.addEventListener("input", () => { PALETTE.query = input.value; filterPalette(); });
+  input.addEventListener("keydown", onPaletteKey);
+}
+function openPalette() {
+  buildPaletteDOM();
+  PALETTE.open = true;
+  PALETTE.items = paletteIndex();
+  PALETTE.query = "";
+  const el = document.getElementById("palette");
+  el.classList.remove("hidden");
+  const input = el.querySelector(".palette-input");
+  input.value = "";
+  filterPalette();
+  input.focus();
+}
+function closePalette() {
+  PALETTE.open = false;
+  const el = document.getElementById("palette");
+  if (el) el.classList.add("hidden");
+}
+function filterPalette() {
+  const q = PALETTE.query.trim().toLowerCase();
+  const src = q ? PALETTE.items.filter((it) => (it.label + " " + it.sub).toLowerCase().includes(q)) : PALETTE.items;
+  PALETTE.results = src.slice(0, 50);
+  PALETTE.active = 0;
+  drawPaletteResults();
+}
+function drawPaletteResults() {
+  const ul = document.querySelector(".palette-results");
+  if (!ul) return;
+  if (!PALETTE.results.length) { ul.innerHTML = `<li class="palette-empty">No matches</li>`; return; }
+  ul.innerHTML = PALETTE.results.map((it, i) => `<li class="palette-item ${i === PALETTE.active ? "active" : ""}" data-i="${i}">
+    <span class="palette-kind ${it.kind}">${it.kind === "project" ? "Project" : "Feature"}</span>
+    <span class="palette-label">${esc(it.label)}</span>
+    ${it.sub ? `<span class="palette-sub">${esc(it.sub)}</span>` : ""}
+  </li>`).join("");
+  ul.querySelectorAll(".palette-item").forEach((li) => {
+    li.addEventListener("mousemove", () => { if (PALETTE.active !== +li.dataset.i) { PALETTE.active = +li.dataset.i; highlightPalette(); } });
+    li.addEventListener("click", () => choosePalette(+li.dataset.i));
+  });
+}
+function highlightPalette() {
+  document.querySelectorAll(".palette-item").forEach((li, i) => li.classList.toggle("active", i === PALETTE.active));
+}
+function onPaletteKey(e) {
+  if (e.key === "ArrowDown") { e.preventDefault(); PALETTE.active = Math.min(PALETTE.active + 1, PALETTE.results.length - 1); highlightPalette(); scrollPaletteActive(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); PALETTE.active = Math.max(PALETTE.active - 1, 0); highlightPalette(); scrollPaletteActive(); }
+  else if (e.key === "Enter") { e.preventDefault(); choosePalette(PALETTE.active); }
+  else if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+}
+function scrollPaletteActive() { const el = document.querySelector(".palette-item.active"); if (el) el.scrollIntoView({ block: "nearest" }); }
+function choosePalette(i) {
+  const it = PALETTE.results[i];
+  if (!it) return;
+  closePalette();
+  if (location.hash === it.hash) route(); // already there → force a re-render
+  else location.hash = it.hash;
+}
+
 // ─── Router / theme / boot ───────────────────────────────────────────────────
 function route() {
-  const m = (location.hash || "#/").match(/^#\/project\/(.+)$/);
-  if (m) renderProject(decodeURIComponent(m[1]));
-  else renderHome();
+  const hash = location.hash || "#/";
+  const fm = hash.match(/^#\/project\/([^/]+)\/f\/(\d+)$/);
+  if (fm) { renderProject(decodeURIComponent(fm[1]), { feature: parseInt(fm[2], 10) }); return; }
+  const m = hash.match(/^#\/project\/(.+)$/);
+  if (m) { renderProject(decodeURIComponent(m[1])); return; }
+  renderHome();
 }
 function initTheme() {
   const saved = localStorage.getItem("nav:theme");
@@ -518,6 +655,14 @@ async function boot() {
   initTheme();
   document.getElementById("brand-name").textContent = CFG.ownerName || CFG.username || "Navigator";
   document.getElementById("github-link").href = `https://github.com/${CFG.username}`;
+  const pbtn = document.getElementById("palette-btn");
+  if (pbtn) pbtn.addEventListener("click", openPalette);
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      PALETTE.open ? closePalette() : openPalette();
+    }
+  });
   if (!CFG.username || CFG.username === "your-github-username") {
     APP.innerHTML = `<div class="banner" style="margin-top:48px">Set your GitHub username in <code>config.js</code>.</div>`;
     return;

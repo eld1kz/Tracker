@@ -216,8 +216,11 @@ main { flex: 1; padding-bottom: 80px; }
 .empty-col { color: var(--text-tertiary); font-size: 13.5px; text-align: center; padding: 22px 8px; }
 
 /* ─── Project detail ─────────────────────────────────────────────────────── */
-.back-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 15px; font-weight: 500; margin-top: 32px; }
-.back-link:hover { text-decoration: underline; }
+.breadcrumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 32px; font-size: 14px; }
+.breadcrumbs a { color: var(--accent); font-weight: 500; }
+.breadcrumbs a:hover { text-decoration: underline; }
+.crumb-sep { color: var(--text-tertiary); }
+.crumb-current { color: var(--text-secondary); font-weight: 500; }
 .detail-meta { display: flex; gap: 18px; flex-wrap: wrap; color: var(--text-secondary); font-size: 15px; margin-top: 14px; }
 .detail-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .stack { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 22px; }
@@ -305,7 +308,11 @@ main { flex: 1; padding-bottom: 80px; }
 /* Reuses the existing tokens; status colors stay calm/translucent.           */
 
 /* Dashboard masthead */
-.dash-head { margin-top: 56px; }
+.dash-head { margin-top: 56px; display: flex; align-items: center; gap: 18px; }
+.dash-avatar {
+  width: 64px; height: 64px; border-radius: 50%; flex: none;
+  border: 1px solid var(--border); object-fit: cover;
+}
 .dash-title {
   font-size: 44px; font-weight: 700;
   letter-spacing: -0.035em; line-height: 1.05;
@@ -663,4 +670,64 @@ main { flex: 1; padding-bottom: 80px; }
   .view-tab { flex: 1; text-align: center; }
   .detail-links { gap: 7px; }
   .mindmap { min-height: 300px; }
+}
+
+/* ─── Deep-linked feature flash ──────────────────────────────────────────── */
+.feature-item.flash { animation: featflash 1.6s var(--ease); }
+@keyframes featflash {
+  0%, 40% { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  100% { background: transparent; }
+}
+
+/* ─── Command palette (Cmd/Ctrl-K) ───────────────────────────────────────── */
+.palette-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: color-mix(in srgb, #000 38%, transparent);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 12vh 20px 20px;
+  animation: fade 0.18s var(--ease);
+}
+.palette-overlay.hidden { display: none; }
+.palette {
+  width: 100%; max-width: 560px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.palette-input {
+  width: 100%; box-sizing: border-box;
+  font-family: inherit; font-size: 17px; color: var(--text);
+  background: transparent; border: none;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.palette-input:focus { outline: none; }
+.palette-results { list-style: none; margin: 0; padding: 6px; max-height: 52vh; overflow-y: auto; }
+.palette-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
+}
+.palette-item.active { background: var(--bg-sunken); }
+.palette-kind {
+  flex: none; font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 3px 7px; border-radius: var(--radius-pill);
+  color: var(--text-secondary); background: var(--bg-sunken);
+}
+.palette-item.active .palette-kind { background: var(--card); }
+.palette-kind.feature { color: var(--progress); background: var(--progress-bg); }
+.palette-label { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palette-sub { font-size: 13px; color: var(--text-tertiary); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+.palette-empty { padding: 24px; text-align: center; color: var(--text-tertiary); font-size: 15px; }
+.palette-foot {
+  display: flex; gap: 16px; padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-tertiary);
+}
+.palette-foot kbd {
+  font-family: inherit; font-size: 11px;
+  background: var(--bg-sunken); border: 1px solid var(--border);
+  border-radius: 5px; padding: 1px 5px; margin-right: 3px;
 }
