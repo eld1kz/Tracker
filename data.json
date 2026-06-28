@@ -1,0 +1,692 @@
+{
+  "generatedAt": "2026-06-28T07:52:00.416Z",
+  "owner": {
+    "name": "Eldar",
+    "username": "eld1kz",
+    "avatarUrl": "https://avatars.githubusercontent.com/u/174009178?v=4"
+  },
+  "languagesAgg": [
+    {
+      "name": "Python",
+      "pct": 47
+    },
+    {
+      "name": "Swift",
+      "pct": 32
+    },
+    {
+      "name": "HTML",
+      "pct": 11
+    },
+    {
+      "name": "JavaScript",
+      "pct": 7
+    },
+    {
+      "name": "CSS",
+      "pct": 3
+    }
+  ],
+  "projects": [
+    {
+      "name": "Tracker",
+      "description": "",
+      "url": "https://github.com/eld1kz/Tracker",
+      "homepage": "",
+      "language": "JavaScript",
+      "languages": [
+        {
+          "name": "JavaScript",
+          "pct": 66
+        },
+        {
+          "name": "CSS",
+          "pct": 32
+        },
+        {
+          "name": "HTML",
+          "pct": 2
+        }
+      ],
+      "stars": 0,
+      "forks": 0,
+      "openIssues": 0,
+      "topics": [],
+      "pushed_at": "2026-06-28T07:51:47Z",
+      "created_at": "2026-06-27T05:15:02Z",
+      "archived": false,
+      "fork": false,
+      "default_branch": "main",
+      "commitCount": 14,
+      "lastCommit": {
+        "message": "Merge: interactive project-navigation tool",
+        "date": "2026-06-28T07:51:46Z",
+        "url": "https://github.com/eld1kz/Tracker/commit/56110544d1e38b67b20e422b39f4c60e0c7d5294"
+      },
+      "summary": "An at-a-glance dashboard for all my projects — dashboard summary, a Kanban board (Planned → In Progress → Done), and per-project detail with a feature checklist.",
+      "summarySource": "readme",
+      "stack": [
+        "JavaScript",
+        "CSS",
+        "HTML"
+      ],
+      "stackSource": "inferred",
+      "readmeUrl": "https://github.com/eld1kz/Tracker/blob/main/README.md",
+      "fileTree": [
+        {
+          "path": ".github",
+          "type": "dir"
+        },
+        {
+          "path": ".gitignore",
+          "type": "file"
+        },
+        {
+          "path": ".nojekyll",
+          "type": "file"
+        },
+        {
+          "path": "README.md",
+          "type": "file"
+        },
+        {
+          "path": "SUMMARY.md",
+          "type": "file"
+        },
+        {
+          "path": "app.js",
+          "type": "file"
+        },
+        {
+          "path": "build",
+          "type": "dir"
+        },
+        {
+          "path": "config.js",
+          "type": "file"
+        },
+        {
+          "path": "index.html",
+          "type": "file"
+        },
+        {
+          "path": "mindmap.js",
+          "type": "file"
+        },
+        {
+          "path": "parser.js",
+          "type": "file"
+        },
+        {
+          "path": "progress.sample.md",
+          "type": "file"
+        },
+        {
+          "path": "styles.css",
+          "type": "file"
+        },
+        {
+          "path": "summarize.js",
+          "type": "file"
+        }
+      ],
+      "tracker": null,
+      "inferredOverview": [
+        {
+          "label": "build",
+          "note": "build tooling",
+          "path": "build"
+        }
+      ]
+    },
+    {
+      "name": "schub_friday",
+      "description": "Personal agent",
+      "url": "https://github.com/eld1kz/schub_friday",
+      "homepage": "",
+      "language": "Python",
+      "languages": [
+        {
+          "name": "Python",
+          "pct": 100
+        }
+      ],
+      "stars": 0,
+      "forks": 0,
+      "openIssues": 0,
+      "topics": [],
+      "pushed_at": "2026-06-27T05:13:06Z",
+      "created_at": "2026-06-05T16:51:34Z",
+      "archived": false,
+      "fork": false,
+      "default_branch": "main",
+      "commitCount": 20,
+      "lastCommit": {
+        "message": "Move build-tracker out to its own repo; keep progress.md",
+        "date": "2026-06-27T05:13:05Z",
+        "url": "https://github.com/eld1kz/schub_friday/commit/749b85f38d9c8cd9adaf7c3e767c91fa17cee7cb"
+      },
+      "summary": "Personal agent",
+      "summarySource": "description",
+      "stack": [
+        "Python",
+        "Claude API",
+        "Supabase",
+        "Railway"
+      ],
+      "stackSource": "progress.md",
+      "readmeUrl": null,
+      "fileTree": [
+        {
+          "path": ".dockerignore",
+          "type": "file"
+        },
+        {
+          "path": ".gitignore",
+          "type": "file"
+        },
+        {
+          "path": "Dockerfile",
+          "type": "file"
+        },
+        {
+          "path": "assistant_step1.py",
+          "type": "file"
+        },
+        {
+          "path": "assistant_step2.py",
+          "type": "file"
+        },
+        {
+          "path": "assistant_step3.py",
+          "type": "file"
+        },
+        {
+          "path": "assistant_step4.py",
+          "type": "file"
+        },
+        {
+          "path": "automations.sql",
+          "type": "file"
+        },
+        {
+          "path": "bot.log",
+          "type": "file"
+        },
+        {
+          "path": "daily_digest.py",
+          "type": "file"
+        },
+        {
+          "path": "habit_category_policies.yaml",
+          "type": "file"
+        },
+        {
+          "path": "habit_config.py",
+          "type": "file"
+        },
+        {
+          "path": "habit_intelligence.sql",
+          "type": "file"
+        },
+        {
+          "path": "habit_llm_service.py",
+          "type": "file"
+        },
+        {
+          "path": "habit_logging.py",
+          "type": "file"
+        },
+        {
+          "path": "habit_policy_service.py",
+          "type": "file"
+        },
+        {
+          "path": "habit_repository.py",
+          "type": "file"
+        },
+        {
+          "path": "health_metrics.sql",
+          "type": "file"
+        },
+        {
+          "path": "health_repository.py",
+          "type": "file"
+        },
+        {
+          "path": "health_service.py",
+          "type": "file"
+        },
+        {
+          "path": "location_service.py",
+          "type": "file"
+        },
+        {
+          "path": "nudge_service.py",
+          "type": "file"
+        },
+        {
+          "path": "oauth_server.py",
+          "type": "file"
+        },
+        {
+          "path": "place_normalization.py",
+          "type": "file"
+        },
+        {
+          "path": "places_provider.py",
+          "type": "file"
+        },
+        {
+          "path": "progress.md",
+          "type": "file"
+        },
+        {
+          "path": "readiness_service.py",
+          "type": "file"
+        },
+        {
+          "path": "reminder_check.py",
+          "type": "file"
+        },
+        {
+          "path": "requirements.txt",
+          "type": "file"
+        },
+        {
+          "path": "retention_cleanup.py",
+          "type": "file"
+        },
+        {
+          "path": "study_planner.sql",
+          "type": "file"
+        },
+        {
+          "path": "study_planner_service.py",
+          "type": "file"
+        },
+        {
+          "path": "study_repository.py",
+          "type": "file"
+        },
+        {
+          "path": "suggestions.sql",
+          "type": "file"
+        },
+        {
+          "path": "tests",
+          "type": "dir"
+        },
+        {
+          "path": "uni_api_grades.py",
+          "type": "file"
+        },
+        {
+          "path": "uni_daily.py",
+          "type": "file"
+        },
+        {
+          "path": "uni_get_chat_id.py",
+          "type": "file"
+        },
+        {
+          "path": "uni_inspect.py",
+          "type": "file"
+        },
+        {
+          "path": "uni_login_test.py",
+          "type": "file"
+        }
+      ],
+      "tracker": {
+        "title": "Jarvis Assistant",
+        "description": "Personal AI assistant on Telegram.",
+        "stack": [
+          "Python",
+          "Claude API",
+          "Supabase",
+          "Railway"
+        ],
+        "features": [
+          {
+            "name": "Telegram bot + Claude",
+            "note": "",
+            "status": "done",
+            "subtasks": []
+          },
+          {
+            "name": "Long-term memory (Supabase)",
+            "note": "",
+            "status": "done",
+            "subtasks": []
+          },
+          {
+            "name": "Calendar + Gmail OAuth",
+            "note": "",
+            "status": "done",
+            "subtasks": []
+          },
+          {
+            "name": "University grades + assignments",
+            "note": "",
+            "status": "done",
+            "subtasks": []
+          },
+          {
+            "name": "Cost routing (Haiku/Sonnet)",
+            "note": "",
+            "status": "done",
+            "subtasks": []
+          },
+          {
+            "name": "Automations engine + auto-suggestions",
+            "note": "",
+            "status": "done",
+            "subtasks": []
+          },
+          {
+            "name": "Always-on Railway deploy",
+            "note": "",
+            "status": "in-progress",
+            "subtasks": []
+          },
+          {
+            "name": "Voice messages (Whisper)",
+            "note": "",
+            "status": "planned",
+            "subtasks": []
+          },
+          {
+            "name": "Health data integration",
+            "note": "",
+            "status": "planned",
+            "subtasks": []
+          },
+          {
+            "name": "Second brain (entity memory)",
+            "note": "",
+            "status": "planned",
+            "subtasks": []
+          }
+        ]
+      },
+      "inferredOverview": null
+    },
+    {
+      "name": "schub-2.0",
+      "description": "",
+      "url": "https://github.com/eld1kz/schub-2.0",
+      "homepage": "",
+      "language": "Swift",
+      "languages": [
+        {
+          "name": "Swift",
+          "pct": 100
+        }
+      ],
+      "stars": 0,
+      "forks": 0,
+      "openIssues": 0,
+      "topics": [],
+      "pushed_at": "2026-05-19T01:53:11Z",
+      "created_at": "2026-05-02T18:04:24Z",
+      "archived": false,
+      "fork": false,
+      "default_branch": "main",
+      "commitCount": 13,
+      "lastCommit": {
+        "message": "Fix notifications table and connection flow",
+        "date": "2026-05-19T01:53:06Z",
+        "url": "https://github.com/eld1kz/schub-2.0/commit/0d28210d6e58704b52edff6320df6cb087e09aea"
+      },
+      "summary": "A Swift project — organized with a Components/ and Models/ layout.",
+      "summarySource": "inferred",
+      "stack": [
+        "Swift"
+      ],
+      "stackSource": "inferred",
+      "readmeUrl": null,
+      "fileTree": [
+        {
+          "path": ".claude",
+          "type": "dir"
+        },
+        {
+          "path": "Assets.xcassets",
+          "type": "dir"
+        },
+        {
+          "path": "Components",
+          "type": "dir"
+        },
+        {
+          "path": "Config.swift",
+          "type": "file"
+        },
+        {
+          "path": "ContentView.swift",
+          "type": "file"
+        },
+        {
+          "path": "Info.plist",
+          "type": "file"
+        },
+        {
+          "path": "Item.swift",
+          "type": "file"
+        },
+        {
+          "path": "Models",
+          "type": "dir"
+        },
+        {
+          "path": "Schub_2_0.entitlements",
+          "type": "file"
+        },
+        {
+          "path": "Schub_2_0App.swift",
+          "type": "file"
+        },
+        {
+          "path": "Services",
+          "type": "dir"
+        },
+        {
+          "path": "Styles.swift",
+          "type": "file"
+        },
+        {
+          "path": "ViewModels",
+          "type": "dir"
+        },
+        {
+          "path": "Views",
+          "type": "dir"
+        }
+      ],
+      "tracker": null,
+      "inferredOverview": [
+        {
+          "label": "Components",
+          "note": "UI components",
+          "path": "Components"
+        },
+        {
+          "label": "Models",
+          "note": "data models",
+          "path": "Models"
+        },
+        {
+          "label": "Services",
+          "note": "services",
+          "path": "Services"
+        }
+      ]
+    },
+    {
+      "name": "finance-telegram-bot",
+      "description": "Personal finance tracking bot",
+      "url": "https://github.com/eld1kz/finance-telegram-bot",
+      "homepage": "",
+      "language": "Python",
+      "languages": [
+        {
+          "name": "Python",
+          "pct": 100
+        }
+      ],
+      "stars": 0,
+      "forks": 0,
+      "openIssues": 0,
+      "topics": [],
+      "pushed_at": "2026-03-23T11:49:50Z",
+      "created_at": "2025-12-23T13:28:09Z",
+      "archived": false,
+      "fork": false,
+      "default_branch": "main",
+      "commitCount": 51,
+      "lastCommit": {
+        "message": "Add /testmaps debug command for Kakao API diagnosis",
+        "date": "2026-03-23T11:49:49Z",
+        "url": "https://github.com/eld1kz/finance-telegram-bot/commit/186de64435b13ac0dfd0b5555c7efb5cafdba87e"
+      },
+      "summary": "Personal finance tracking bot",
+      "summarySource": "description",
+      "stack": [
+        "Python",
+        "python-telegram-bot",
+        "Anthropic"
+      ],
+      "stackSource": "inferred",
+      "readmeUrl": "https://github.com/eld1kz/finance-telegram-bot/blob/main/README.md",
+      "fileTree": [
+        {
+          "path": ".gitignore",
+          "type": "file"
+        },
+        {
+          "path": "Procfile",
+          "type": "file"
+        },
+        {
+          "path": "README.md",
+          "type": "file"
+        },
+        {
+          "path": "mature_finance.py",
+          "type": "file"
+        },
+        {
+          "path": "requirements.txt",
+          "type": "file"
+        },
+        {
+          "path": "runtime.txt",
+          "type": "file"
+        }
+      ],
+      "tracker": null,
+      "inferredOverview": [
+        {
+          "label": "requirements.txt",
+          "note": "Python deps",
+          "path": "requirements.txt"
+        }
+      ]
+    },
+    {
+      "name": "tusup",
+      "description": "",
+      "url": "https://github.com/eld1kz/tusup",
+      "homepage": "",
+      "language": "HTML",
+      "languages": [
+        {
+          "name": "HTML",
+          "pct": 91
+        },
+        {
+          "name": "JavaScript",
+          "pct": 7
+        },
+        {
+          "name": "Shell",
+          "pct": 1
+        }
+      ],
+      "stars": 0,
+      "forks": 0,
+      "openIssues": 0,
+      "topics": [],
+      "pushed_at": "2026-02-06T09:20:21Z",
+      "created_at": "2026-01-09T20:10:15Z",
+      "archived": false,
+      "fork": false,
+      "default_branch": "main",
+      "commitCount": 2,
+      "lastCommit": {
+        "message": "Add public folder, update project structure",
+        "date": "2026-01-25T18:38:14Z",
+        "url": "https://github.com/eld1kz/tusup/commit/96d2b3403fc1a6c8b34f044fb852c1aa61074d07"
+      },
+      "summary": "A HTML project — organized with a public/ layout.",
+      "summarySource": "inferred",
+      "stack": [
+        "HTML",
+        "JavaScript",
+        "Shell",
+        "Node.js",
+        "Express"
+      ],
+      "stackSource": "inferred",
+      "readmeUrl": null,
+      "fileTree": [
+        {
+          "path": ".DS_Store",
+          "type": "file"
+        },
+        {
+          "path": ".gitignore",
+          "type": "file"
+        },
+        {
+          "path": "auto-push-mac.sh",
+          "type": "file"
+        },
+        {
+          "path": "colleges-database.json",
+          "type": "file"
+        },
+        {
+          "path": "package-lock.json",
+          "type": "file"
+        },
+        {
+          "path": "package.json",
+          "type": "file"
+        },
+        {
+          "path": "public",
+          "type": "dir"
+        },
+        {
+          "path": "server.js",
+          "type": "file"
+        }
+      ],
+      "tracker": null,
+      "inferredOverview": [
+        {
+          "label": "public",
+          "note": "static assets",
+          "path": "public"
+        },
+        {
+          "label": "package.json",
+          "note": "Node manifest",
+          "path": "package.json"
+        }
+      ]
+    }
+  ]
+}
