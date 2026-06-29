@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-28T19:03:35.345Z",
+  "generatedAt": "2026-06-29T02:36:33.607Z",
   "owner": {
     "name": "Eldar",
     "username": "eld1kz",
@@ -8,7 +8,7 @@
   "languagesAgg": [
     {
       "name": "Python",
-      "pct": 47
+      "pct": 46
     },
     {
       "name": "Swift",
@@ -52,16 +52,16 @@
       "forks": 0,
       "openIssues": 0,
       "topics": [],
-      "pushed_at": "2026-06-28T13:18:00Z",
+      "pushed_at": "2026-06-28T19:19:55Z",
       "created_at": "2026-06-27T05:15:02Z",
       "archived": false,
       "fork": false,
       "default_branch": "main",
-      "commitCount": 17,
+      "commitCount": 19,
       "lastCommit": {
-        "message": "chore: refresh dashboard data [skip ci]",
-        "date": "2026-06-28T13:17:59Z",
-        "url": "https://github.com/eld1kz/Tracker/commit/c1fdbaa99bf37f86119bf1bc2669d963abccad79"
+        "message": "Add command palette, feature deep links, and key-files/avatar polish",
+        "date": "2026-06-28T19:18:21Z",
+        "url": "https://github.com/eld1kz/Tracker/commit/22cc4a55f8dc3e10c74de034c1369fe116907eaa"
       },
       "summary": "An at-a-glance dashboard for all my projects — dashboard summary, a Kanban board (Planned → In Progress → Done), and per-project detail with a feature checklist.",
       "summarySource": "readme",
