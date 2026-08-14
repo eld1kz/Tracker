@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-13T18:49:48.007Z",
+  "generatedAt": "2026-08-14T01:06:36.175Z",
   "owner": {
     "name": "Eldar",
     "username": "eld1kz",
@@ -28,6 +28,121 @@
     }
   ],
   "projects": [
+    {
+      "name": "Tracker",
+      "description": "",
+      "url": "https://github.com/eld1kz/Tracker",
+      "homepage": "",
+      "language": "JavaScript",
+      "languages": [
+        {
+          "name": "JavaScript",
+          "pct": 66
+        },
+        {
+          "name": "CSS",
+          "pct": 32
+        },
+        {
+          "name": "HTML",
+          "pct": 2
+        }
+      ],
+      "stars": 0,
+      "forks": 0,
+      "openIssues": 0,
+      "topics": [],
+      "pushed_at": "2026-08-13T18:49:49Z",
+      "created_at": "2026-06-27T05:15:02Z",
+      "archived": false,
+      "fork": false,
+      "default_branch": "main",
+      "commitCount": 203,
+      "lastCommit": {
+        "message": "chore: refresh dashboard data [skip ci]",
+        "date": "2026-08-13T18:49:48Z",
+        "url": "https://github.com/eld1kz/Tracker/commit/3b162e389e3bd7db382d7a928c98dbefb51dfc46"
+      },
+      "summary": "An at-a-glance dashboard for all my projects — dashboard summary, a Kanban board (Planned → In Progress → Done), and per-project detail with a feature checklist.",
+      "summarySource": "readme",
+      "stack": [
+        "JavaScript",
+        "CSS",
+        "HTML"
+      ],
+      "stackSource": "inferred",
+      "readmeUrl": "https://github.com/eld1kz/Tracker/blob/main/README.md",
+      "fileTree": [
+        {
+          "path": ".github",
+          "type": "dir"
+        },
+        {
+          "path": ".gitignore",
+          "type": "file"
+        },
+        {
+          "path": ".nojekyll",
+          "type": "file"
+        },
+        {
+          "path": "README.md",
+          "type": "file"
+        },
+        {
+          "path": "SUMMARY.md",
+          "type": "file"
+        },
+        {
+          "path": "app.js",
+          "type": "file"
+        },
+        {
+          "path": "build",
+          "type": "dir"
+        },
+        {
+          "path": "config.js",
+          "type": "file"
+        },
+        {
+          "path": "data.json",
+          "type": "file"
+        },
+        {
+          "path": "index.html",
+          "type": "file"
+        },
+        {
+          "path": "mindmap.js",
+          "type": "file"
+        },
+        {
+          "path": "parser.js",
+          "type": "file"
+        },
+        {
+          "path": "progress.sample.md",
+          "type": "file"
+        },
+        {
+          "path": "styles.css",
+          "type": "file"
+        },
+        {
+          "path": "summarize.js",
+          "type": "file"
+        }
+      ],
+      "tracker": null,
+      "inferredOverview": [
+        {
+          "label": "build",
+          "note": "build tooling",
+          "path": "build"
+        }
+      ]
+    },
     {
       "name": "schub_friday",
       "description": "Personal agent",
@@ -300,121 +415,6 @@
         ]
       },
       "inferredOverview": null
-    },
-    {
-      "name": "Tracker",
-      "description": "",
-      "url": "https://github.com/eld1kz/Tracker",
-      "homepage": "",
-      "language": "JavaScript",
-      "languages": [
-        {
-          "name": "JavaScript",
-          "pct": 66
-        },
-        {
-          "name": "CSS",
-          "pct": 32
-        },
-        {
-          "name": "HTML",
-          "pct": 2
-        }
-      ],
-      "stars": 0,
-      "forks": 0,
-      "openIssues": 0,
-      "topics": [],
-      "pushed_at": "2026-08-13T12:46:24Z",
-      "created_at": "2026-06-27T05:15:02Z",
-      "archived": false,
-      "fork": false,
-      "default_branch": "main",
-      "commitCount": 202,
-      "lastCommit": {
-        "message": "chore: refresh dashboard data [skip ci]",
-        "date": "2026-08-13T12:46:23Z",
-        "url": "https://github.com/eld1kz/Tracker/commit/5382a677a0229d9c6f1e3efa83068444ac255e5d"
-      },
-      "summary": "An at-a-glance dashboard for all my projects — dashboard summary, a Kanban board (Planned → In Progress → Done), and per-project detail with a feature checklist.",
-      "summarySource": "readme",
-      "stack": [
-        "JavaScript",
-        "CSS",
-        "HTML"
-      ],
-      "stackSource": "inferred",
-      "readmeUrl": "https://github.com/eld1kz/Tracker/blob/main/README.md",
-      "fileTree": [
-        {
-          "path": ".github",
-          "type": "dir"
-        },
-        {
-          "path": ".gitignore",
-          "type": "file"
-        },
-        {
-          "path": ".nojekyll",
-          "type": "file"
-        },
-        {
-          "path": "README.md",
-          "type": "file"
-        },
-        {
-          "path": "SUMMARY.md",
-          "type": "file"
-        },
-        {
-          "path": "app.js",
-          "type": "file"
-        },
-        {
-          "path": "build",
-          "type": "dir"
-        },
-        {
-          "path": "config.js",
-          "type": "file"
-        },
-        {
-          "path": "data.json",
-          "type": "file"
-        },
-        {
-          "path": "index.html",
-          "type": "file"
-        },
-        {
-          "path": "mindmap.js",
-          "type": "file"
-        },
-        {
-          "path": "parser.js",
-          "type": "file"
-        },
-        {
-          "path": "progress.sample.md",
-          "type": "file"
-        },
-        {
-          "path": "styles.css",
-          "type": "file"
-        },
-        {
-          "path": "summarize.js",
-          "type": "file"
-        }
-      ],
-      "tracker": null,
-      "inferredOverview": [
-        {
-          "label": "build",
-          "note": "build tooling",
-          "path": "build"
-        }
-      ]
     },
     {
       "name": "schub-2.0",
